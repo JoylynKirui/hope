@@ -54,6 +54,6 @@ urlpatterns = [
     # path("dashboard/admin/planner/<int:profile_id>/", views.admin_planner_detail, name="admin_planner_detail"),
     # path("dashboard/admin/subscription/<int:sub_id>/edit/", views.admin_subscription_edit, name="admin_subscription_edit"),
     # path("dashboard/admin/subscription/<int:sub_id>/toggle/", views.admin_subscription_toggle, name="admin_subscription_toggle"),
-    # path("booking/<int:booking_id>/add-traveler/", views.add_traveler, name="add_traveler"),
+    path("booking/<int:booking_id>/add-traveler/", views.add_traveler, name="add_traveler"),
   
 ]
