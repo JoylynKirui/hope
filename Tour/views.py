@@ -264,6 +264,7 @@ class BookingDetailView(DetailView):
 
 
 # ---------- Destination pages ----------
+
 @method_decorator(login_required, name="dispatch")
 class DestinationCreateView(CreateView):
     """
@@ -310,6 +311,8 @@ def add_traveler(request, booking_id):
     return render(request, "travelers/add_traveler.html", {"form": form, "booking": booking})
 
 
+from decimal import Decimal
+
 @method_decorator(login_required, name="dispatch")
 class DestinationDetailView(DetailView):
     model = Destination
@@ -325,6 +328,8 @@ class DestinationDetailView(DetailView):
                 Prefetch("activities", queryset=Activity.objects.prefetch_related("travelers").order_by("date", "start_time")),
                 Prefetch("dining_expenses", queryset=DiningExpense.objects.select_related("restaurant").prefetch_related("travelers")),
                 Prefetch("restaurants", queryset=Restaurant.objects.all()),
+                Prefetch("arriving_legs", queryset=TravelLeg.objects.all()),
+                Prefetch("departing_legs", queryset=TravelLeg.objects.all()),
             )
         )
 
@@ -332,7 +337,7 @@ class DestinationDetailView(DetailView):
         ctx = super().get_context_data(**kwargs)
         dest: Destination = ctx["destination"]
 
-        # day-by-day activities
+        # --- Day-by-day activities ---
         days = []
         current = dest.start_date
         while current <= dest.end_date:
@@ -340,35 +345,47 @@ class DestinationDetailView(DetailView):
             days.append({"date": current, "activities": day_activities})
             current += timedelta(days=1)
 
-        # totals for this destination
+        # --- Destination totals ---
         accom_total = sum((s.total_cost or 0) for s in dest.stays.all())
         activities_total = sum((a.cost or 0) for a in dest.activities.all())
         dining_total = sum((d.cost or 0) for d in dest.dining_expenses.all())
+
+        # --- Transport totals ---
+        arriving = dest.arriving_legs.all()
+        departing = dest.departing_legs.all()
+        transport_total = sum((leg.cost or Decimal("0.00")) for leg in arriving) + sum((leg.cost or Decimal("0.00")) for leg in departing)
+
+        # --- Grand total ---
+        grand_total = accom_total + activities_total + dining_total + transport_total
 
         ctx["totals"] = {
             "Accommodation": accom_total,
             "Activities": activities_total,
             "Dining": dining_total,
+            "Transport": transport_total,
             "Subtotal": accom_total + activities_total + dining_total,
+            "Total": grand_total,
         }
 
-        # 🔹 NEW: per-traveler totals for this destination only
+        # --- Per-traveler totals for this destination ---
         traveler_costs = []
         travelers = dest.booking.travelers.all()
         for t in travelers:
             stay_total = sum((s.total_cost or 0) for s in dest.stays.filter(travelers=t))
             act_total = sum((a.cost or 0) for a in dest.activities.filter(travelers=t))
-            dining_total = sum((d.cost or 0) for d in dest.dining_expenses.filter(travelers=t))
+            dining_total_t = sum((d.cost or 0) for d in dest.dining_expenses.filter(travelers=t))
+            transport_total_t = sum((leg.cost or Decimal("0.00")) for leg in arriving.filter(travelers=t)) + sum((leg.cost or Decimal("0.00")) for leg in departing.filter(travelers=t))
+
             traveler_costs.append({
                 "traveler": t,
                 "Accommodation": stay_total,
                 "Activities": act_total,
-                "Dining": dining_total,
-                "Total": stay_total + act_total + dining_total,
+                "Dining": dining_total_t,
+                "Transport": transport_total_t,
+                "Total": stay_total + act_total + dining_total_t + transport_total_t,
             })
 
         ctx["traveler_costs"] = traveler_costs
-
         ctx["tab_labels"] = ["Overview","Gallery", "Stays", "Activities", "Dining", "Transport", "Map","Costs"]
         ctx["itinerary_days"] = days
         return ctx
@@ -490,6 +507,7 @@ def upload_stay(request, destination_id):
         "form": form, "title": "Add Stay", "destination": destination
     })
 
+
 @login_required
 def upload_dining_expense(request, destination_id):
     destination = get_object_or_404(Destination, id=destination_id)
@@ -511,6 +529,30 @@ def upload_dining_expense(request, destination_id):
     return render(request, "tour/upload_dining.html", {
         "form": form, "title": "Add Dining Expense", "destination": destination
     })
+
+
+
+# @login_required
+# def upload_dining_expense(request, destination_id):
+#     destination = get_object_or_404(Destination, id=destination_id)
+#     booking = destination.booking  # ✅
+
+#     if request.method == "POST":
+#         form = DiningExpenseForm(request.POST, booking=booking)  # ✅
+#         if form.is_valid():
+#             de = form.save(commit=False)
+#             de.destination = destination
+#             de.save()
+#             form.save_m2m()  # ✅ travelers saved
+#             messages.success(request, "Dining expense added.")
+#             return redirect("destination_detail", pk=destination.id)
+#     else:
+#         form = DiningExpenseForm(initial={"destination": destination}, booking=booking)
+#         form.fields["destination"].widget = forms.HiddenInput()
+
+#     return render(request, "tour/upload_dining.html", {
+#         "form": form, "title": "Add Dining Expense", "destination": destination
+#     })
 
 
 @login_required
