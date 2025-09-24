@@ -1,11 +1,17 @@
-{% extends "base.html" %}
+{% extends "base_dashboard.html" %}
 {% block content %}
-<h1>Edit Subscription for {{ subscription.profile.user.username }}</h1>
+<div class="container">
+  <h1>Edit Subscription</h1>
+  <p><strong>Planner:</strong> {{ subscription.profile.user.username }}</p>
+  <p><strong>Plan:</strong> {{ subscription.plan }}</p>
+  <p><strong>Status:</strong> {{ subscription.status }}</p>
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Save</button>
-  <a href="{% url 'admin_dashboard' %}">Back</a>
-</form>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+  </form>
+
+  <p><a href="{% url 'admin_dashboard' %}">Back to dashboard</a></p>
+</div>
 {% endblock %}

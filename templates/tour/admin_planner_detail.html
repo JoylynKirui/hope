@@ -1,0 +1,53 @@
+{% extends "base_dashboard.html" %}
+{% block content %}
+<div class="container">
+  <h1>Planner: {{ profile.user.username }}</h1>
+  <p><strong>Email:</strong> {{ profile.user.email }}</p>
+  <p><strong>Company:</strong> {{ profile.company_name }}</p>
+
+  <h2>Subscriptions</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Plan</th>
+        <th>Status</th>
+        <th>Payment Status</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sub in subscriptions %}
+      <tr>
+        <td>{{ sub.plan }}</td>
+        <td>{{ sub.status }}</td>
+        <td>{{ sub.payment_status }}</td>
+        <td>{{ sub.start_date }}</td>
+        <td>{{ sub.end_date }}</td>
+        <td>
+          <a href="{% url 'admin_subscription_edit' sub.id %}">Edit</a>
+          | <form method="post" action="{% url 'admin_subscription_toggle' sub.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit">Toggle</button>
+            </form>
+          {% if sub.status == "Pending" and sub.payment_status == "completed" %}
+            | <form method="post" action="" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="approve_id" value="{{ sub.id }}">
+                <button type="submit">Approve</button>
+              </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">No subscriptions yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p><a href="{% url 'admin_dashboard' %}">Back to dashboard</a></p>
+</div>
+{% endblock %}

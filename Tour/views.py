@@ -1,6 +1,7 @@
 
 from django import forms
 import datetime
+# from weasyprint import HTML
 from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.admin.views.decorators import staff_member_required
@@ -585,7 +586,6 @@ from .models import Booking
 
 from django.http import HttpResponse
 from django.template.loader import get_template
-from weasyprint import HTML
 import tempfile
 
 from .models import Booking
@@ -765,6 +765,17 @@ def execute_payment(request):
         return render(request, "subscriptions/payment_error.html", {"error": payment.error})
 
 
+from datetime import date, timedelta
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q, Prefetch
+
+from .models import Profile, Subscription
+from .forms import AdminSubscriptionForm
+
+
 # ========================
 # ADMIN VIEWS
 # ========================
@@ -774,34 +785,56 @@ def admin_dashboard(request):
     """List planners with their latest subscription (staff-only)."""
     q = request.GET.get("q", "").strip()
 
-    subs_prefetch = Prefetch('subscriptions', queryset=Subscription.objects.order_by('-start_date'))
-    profiles_qs = Profile.objects.select_related('user').prefetch_related(subs_prefetch)
+    subs_prefetch = Prefetch(
+        "subscriptions", queryset=Subscription.objects.order_by("-start_date")
+    )
+    profiles_qs = Profile.objects.select_related("user").prefetch_related(subs_prefetch)
 
     if q:
         profiles_qs = profiles_qs.filter(
-            Q(user__username__icontains=q) |
-            Q(user__email__icontains=q) |
-            Q(company_name__icontains=q)
+            Q(user__username__icontains=q)
+            | Q(user__email__icontains=q)
+            | Q(company_name__icontains=q)
         )
 
     paginator = Paginator(profiles_qs, 25)
-    page = request.GET.get('page')
+    page = request.GET.get("page")
     profiles = paginator.get_page(page)
 
-    return render(request, "tour/admin_dashboard.html", {"profiles": profiles, "q": q})
+    return render(
+        request, "tour/admin_dashboard.html", {"profiles": profiles, "q": q}
+    )
 
 
 @staff_member_required
 def admin_planner_detail(request, profile_id):
-    """Detail view of planner with subscriptions"""
-    profile = get_object_or_404(Profile.objects.select_related('user').prefetch_related('subscriptions'), pk=profile_id)
-    return render(request, "tour/admin_planner_detail.html", {"profile": profile})
+    """Detail view of a planner and their subscriptions (with approve button)."""
+    profile = get_object_or_404(Profile.objects.select_related("user"), id=profile_id)
+    subscriptions = profile.subscriptions.all().order_by("-start_date")
+
+    if request.method == "POST":
+        sub_id = request.POST.get("approve_id")
+        if sub_id:
+            subscription = get_object_or_404(Subscription, id=sub_id, profile=profile)
+            subscription.activate(months=1)  # default 1 month
+            messages.success(
+                request,
+                f"Subscription '{subscription.plan}' approved and activated until {subscription.end_date}.",
+            )
+            return redirect("admin_planner_detail", profile_id=profile.id)
+
+    return render(
+        request,
+        "tour/admin_planner_detail.html",
+        {"profile": profile, "subscriptions": subscriptions},
+    )
 
 
 @staff_member_required
 def admin_subscription_edit(request, sub_id):
-    """Admin edit/extend subscription"""
+    """Admin can edit/extend subscription duration or details."""
     subscription = get_object_or_404(Subscription, pk=sub_id)
+
     if request.method == "POST":
         form = AdminSubscriptionForm(request.POST, instance=subscription)
         if form.is_valid():
@@ -814,22 +847,33 @@ def admin_subscription_edit(request, sub_id):
             return redirect("admin_dashboard")
     else:
         form = AdminSubscriptionForm(instance=subscription)
-    return render(request, "tour/admin_subscription_edit.html", {"form": form, "subscription": subscription})
+
+    return render(
+        request,
+        "tour/admin_subscription_edit.html",
+        {"form": form, "subscription": subscription},
+    )
 
 
 @staff_member_required
 def admin_subscription_toggle(request, sub_id):
-    """Admin approves / deactivates subscription"""
+    """Admin approves or toggles subscription activation/expiry."""
     subscription = get_object_or_404(Subscription, pk=sub_id)
+
     if request.method == "POST":
         if subscription.status == "Pending" and subscription.payment_status == "completed":
-            # Approve subscription
+            # Approve & activate
+            subscription.activate(months=1)
+            messages.success(request, f"Subscription {subscription.plan} approved and activated.")
+        elif subscription.status == "Active":
+            subscription.status = "Expired"
+            subscription.save()
+            messages.success(request, f"Subscription {subscription.plan} deactivated.")
+        else:
             subscription.status = "Active"
             subscription.start_date = date.today()
             subscription.end_date = date.today() + timedelta(days=30)
-        else:
-            # Toggle deactivation
-            subscription.status = "Expired"
-        subscription.save()
-        messages.success(request, f"Subscription status updated: {subscription.status}")
+            subscription.save()
+            messages.success(request, f"Subscription {subscription.plan} re-activated.")
+
     return redirect("admin_dashboard")
