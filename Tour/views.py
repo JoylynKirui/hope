@@ -598,58 +598,84 @@ def upload_travel_leg(request, booking_id):
         "form": form, "title": "Add Travel Leg", "booking": booking
     })
 
-
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    Image as RLImage, PageBreak
-)
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import os
-
-from .models import Booking
-
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
-from django.contrib.auth.decorators import login_required
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    Image as RLImage, PageBreak
-)
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import os
-
-from .models import Booking
-
-from django.http import HttpResponse
-from django.template.loader import get_template
+from weasyprint import HTML
+from django.conf import settings
 import tempfile
-
-from .models import Booking
+import os
 
 def booking_pdf(request, pk):
     booking = Booking.objects.get(pk=pk)
     travel_legs = booking.travel_legs.all()
 
-    # Load the HTML template you wrote for the PDF
     template = get_template("tour/booking_pdf.html")
     html_string = template.render({
         "booking": booking,
         "travel_legs": travel_legs,
     })
 
-    # Create a PDF
     with tempfile.NamedTemporaryFile(delete=True) as output:
-        HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(output.name)
+        HTML(
+            string=html_string,
+            base_url=settings.BASE_DIR  # <-- filesystem root so static/media resolve
+        ).write_pdf(output.name)
+
         output.seek(0)
         response = HttpResponse(output.read(), content_type="application/pdf")
         response['Content-Disposition'] = f'attachment; filename="Booking_{booking.id}.pdf"'
         return response
+
+
+# from django.shortcuts import get_object_or_404
+# from django.http import HttpResponse
+# from reportlab.platypus import (
+#     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+#     Image as RLImage, PageBreak
+# )
+# from reportlab.lib.pagesizes import A4
+# from reportlab.lib import colors
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# import os
+
+# from .models import Booking
+
+# from django.shortcuts import get_object_or_404
+# from django.http import HttpResponse
+# from django.contrib.auth.decorators import login_required
+# from reportlab.platypus import (
+#     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+#     Image as RLImage, PageBreak
+# )
+# from reportlab.lib.pagesizes import A4
+# from reportlab.lib import colors
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# import os
+
+# from .models import Booking
+
+# from django.http import HttpResponse
+# from django.template.loader import get_template
+# import tempfile
+
+# from .models import Booking
+
+# def booking_pdf(request, pk):
+#     booking = Booking.objects.get(pk=pk)
+#     travel_legs = booking.travel_legs.all()
+
+#     # Load the HTML template you wrote for the PDF
+#     template = get_template("tour/booking_pdf.html")
+#     html_string = template.render({
+#         "booking": booking,
+#         "travel_legs": travel_legs,
+#     })
+
+#     # Create a PDF
+#     with tempfile.NamedTemporaryFile(delete=True) as output:
+#         HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(output.name)
+#         output.seek(0)
+#         response = HttpResponse(output.read(), content_type="application/pdf")
+#         response['Content-Disposition'] = f'attachment; filename="Booking_{booking.id}.pdf"'
+#         return response
 
 
 
