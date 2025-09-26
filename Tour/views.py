@@ -1,7 +1,7 @@
 
 from django import forms
 import datetime
-# from weasyprint import HTML
+from weasyprint import HTML
 from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.admin.views.decorators import staff_member_required
