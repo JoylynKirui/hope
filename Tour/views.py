@@ -2,6 +2,16 @@
 from django import forms
 from django.template.loader import get_template
 import datetime
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    Image as RLImage, PageBreak
+)
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+import os
 from weasyprint import HTML
 from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
@@ -626,16 +636,7 @@ def booking_pdf(request, pk):
         return response
 
 
-# from django.shortcuts import get_object_or_404
-# from django.http import HttpResponse
-# from reportlab.platypus import (
-#     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-#     Image as RLImage, PageBreak
-# )
-# from reportlab.lib.pagesizes import A4
-# from reportlab.lib import colors
-# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-# import os
+
 
 # from .models import Booking
 
